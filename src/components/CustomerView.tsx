@@ -48,21 +48,21 @@ useEffect(() => {
 
       console.log("LIFF READY");
 
-      // ถ้าเปิดเว็บปกติ
+      // เปิดผ่าน browser ปกติ
       // ไม่ต้อง login LINE
       if (!liff.isInClient()) {
-        console.log("Normal browser mode");
+        console.log("Browser mode");
         return;
       }
 
-      // ถ้าเปิดจาก LINE
-      // แต่ยังไม่ได้ login
+      // เปิดใน LINE แต่ยังไม่ได้ login
+      // ไม่ต้องเด้ง login
       if (!liff.isLoggedIn()) {
-        liff.login();
+        console.log("LINE opened but not logged in");
         return;
       }
 
-      // ดึงข้อมูล LINE
+      // ดึง profile
       const profile = await liff.getProfile();
 
       console.log("LINE PROFILE:", profile);
