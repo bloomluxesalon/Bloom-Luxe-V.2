@@ -99,7 +99,7 @@ useEffect(() => {
     if (!bookingDate) return [];
 
     const occupied = getOccupiedSlots(bookingDate);
-    const interval = 5;
+    const interval = 1;
     const isToday = bookingDate === todayStr;
     const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
     const duration = course.includes("90") ? 90 : 60;
