@@ -38,7 +38,7 @@ useEffect(() => {
   async function initLiff() {
     try {
       if (typeof liff === "undefined") {
-        console.error("LIFF SDK not loaded");
+        console.log("LIFF SDK not loaded");
         return;
       }
 
@@ -47,23 +47,22 @@ useEffect(() => {
       });
 
       console.log("LIFF READY");
-      console.log("isInClient:", liff.isInClient());
-      console.log("isLoggedIn:", liff.isLoggedIn());
 
-      // เปิดจาก browser ปกติ
+      // ถ้าเปิดเว็บปกติ
       // ไม่ต้อง login LINE
       if (!liff.isInClient()) {
         console.log("Normal browser mode");
         return;
       }
 
-      // เปิดจาก LINE แต่ยังไม่ได้ login
+      // ถ้าเปิดจาก LINE
+      // แต่ยังไม่ได้ login
       if (!liff.isLoggedIn()) {
         liff.login();
         return;
       }
 
-      // ดึง profile LINE
+      // ดึงข้อมูล LINE
       const profile = await liff.getProfile();
 
       console.log("LINE PROFILE:", profile);
