@@ -43,7 +43,7 @@ export function CustomerView() {
         }
 
         await liff.init({
-          liffId: "2009265660-2ZsXyxi7",
+          liffId: "2009162443-gCuBKaOD",
         });
 
         // เปิดจาก browser ปกติ: ไม่เด้งเข้า LINE
