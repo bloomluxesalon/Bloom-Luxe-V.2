@@ -400,7 +400,7 @@ if (lineUserId) {
                   <input
                     required
                     type="time"
-                    step={300}
+                    step={60}
                     value={bookingTime}
                     disabled={!bookingDate}
                     onChange={(e) => setBookingTime(e.target.value)}
