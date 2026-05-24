@@ -293,70 +293,156 @@ export function AdminView() {
     </div>
   );
 
-  const renderQueueCard = (q: QueueItem) => {
-    const inactive = ["Completed", "Cancelled", "Archived"].includes(q.status);
+const renderQueueCard = (q: QueueItem) => {
+  const inactive = ["Completed", "Cancelled", "Archived"].includes(q.status);
 
-    return (
-      <div key={q.id} className={`rounded-lg border bg-white shadow-sm ${q.status === "Pending" ? "border-blue-300" : "border-[var(--color-light-brown)]"} ${inactive ? "opacity-75" : ""}`}>
-        <div className="flex flex-col gap-3 border-b border-[#E5DFD4] px-4 py-3 md:flex-row md:items-center md:justify-between">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-12 w-16 shrink-0 items-center justify-center rounded-md bg-[#F8F4EE] font-mono text-sm font-bold text-[var(--color-dark-brown)]">
-              {q.id}
-            </div>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="truncate text-base font-bold text-[var(--color-dark-brown)]">{q.nickname || "ไม่ระบุชื่อ"}</h3>
-                <StatusBadge status={q.status} />
-              </div>
-              <div className="mt-1 text-xs text-[#847568]">
-                {q.bookingDate} · {q.bookingTime} · {q.phone || "-"} · {q.gender || "-"}
-              </div>
-            </div>
-          </div>
-          {renderActions(q)}
-        </div>
-
-        <div className="grid gap-3 px-4 py-3 md:grid-cols-[1fr_auto]">
-          <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
-            <div>
-              <div className="text-[11px] font-bold uppercase text-[#847568]">Course</div>
-              <div className="font-semibold">{q.course}</div>
-            </div>
-            <div>
-              <div className="text-[11px] font-bold uppercase text-[#847568]">Price</div>
-              <div className="font-semibold text-green-700">{money(q.actualPrice)}</div>
-            </div>
-            <div>
-              <div className="text-[11px] font-bold uppercase text-[#847568]">Water / Oil</div>
-              <div className="truncate font-semibold">{q.waterTemp || "-"} / {q.oil || "-"}</div>
-            </div>
-            <div>
-              <div className="text-[11px] font-bold uppercase text-[#847568]">Pressure</div>
-              <div className="truncate font-semibold">{q.massagePressure || "-"} / {q.headPressure || "-"}</div>
-            </div>
+  return (
+    <div
+      key={q.id}
+      className={`rounded-lg border bg-white shadow-sm ${
+        q.status === "Pending"
+          ? "border-blue-300"
+          : "border-[var(--color-light-brown)]"
+      } ${inactive ? "opacity-75" : ""}`}
+    >
+      <div className="flex flex-col gap-3 border-b border-[#E5DFD4] px-4 py-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-12 w-16 shrink-0 items-center justify-center rounded-md bg-[#F8F4EE] font-mono text-sm font-bold text-[var(--color-dark-brown)]">
+            {q.id}
           </div>
 
-          <div className="flex flex-wrap gap-2 md:justify-end">
-            <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#E5DFD4] bg-[#FAF8F5] px-3 text-xs font-semibold">
-              <input type="checkbox" checked={q.isDepositPaid} onChange={(e) => handleCheckbox(q.id, "isDepositPaid", e.target.checked)} className="h-4 w-4" />
-              มัดจำแล้ว
-            </label>
-            <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#E5DFD4] bg-[#FAF8F5] px-3 text-xs font-semibold">
-              <input type="checkbox" checked={q.isPaid} onChange={(e) => handleCheckbox(q.id, "isPaid", e.target.checked)} className="h-4 w-4" />
-              จ่ายครบ
-            </label>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="truncate text-base font-bold text-[var(--color-dark-brown)]">
+                {q.nickname || "ไม่ระบุชื่อ"}
+              </h3>
+              <StatusBadge status={q.status} />
+            </div>
+
+            <div className="mt-1 text-xs text-[#847568]">
+              {q.bookingDate} · {q.bookingTime} · {q.phone || "-"} ·{" "}
+              {q.gender || "-"}
+            </div>
           </div>
         </div>
 
-        {(q.caution || q.internalNote) && (
-          <div className="grid gap-2 border-t border-[#E5DFD4] bg-[#FFFDF9] px-4 py-3 text-sm sm:grid-cols-2">
-            {q.caution && <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-red-700">ข้อควรระวัง: {q.caution}</div>}
-            {q.internalNote && <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800">โน้ตพนักงาน: {q.internalNote}</div>}
-          </div>
-        )}
+        {renderActions(q)}
       </div>
-    );
-  };
+
+      <div className="grid gap-3 px-4 py-3 md:grid-cols-[1fr_auto]">
+        <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4 lg:grid-cols-8">
+          <div>
+            <div className="text-[11px] font-bold uppercase text-[#847568]">
+              Course
+            </div>
+            <div className="font-semibold">{q.course || "-"}</div>
+          </div>
+
+          <div>
+            <div className="text-[11px] font-bold uppercase text-[#847568]">
+              Price
+            </div>
+            <div className="font-semibold text-green-700">
+              {money(q.actualPrice)}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-[11px] font-bold uppercase text-[#847568]">
+              Gender
+            </div>
+            <div className="font-semibold">{q.gender || "-"}</div>
+          </div>
+
+          <div>
+            <div className="text-[11px] font-bold uppercase text-[#847568]">
+              Water
+            </div>
+            <div className="truncate font-semibold">
+              {q.waterTemp || "-"}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-[11px] font-bold uppercase text-[#847568]">
+              Oil
+            </div>
+            <div className="truncate font-semibold">{q.oil || "-"}</div>
+          </div>
+
+          <div>
+            <div className="text-[11px] font-bold uppercase text-[#847568]">
+              Shampoo
+            </div>
+            <div className="truncate font-semibold">
+              {q.shampoo || "-"}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-[11px] font-bold uppercase text-[#847568]">
+              Massage
+            </div>
+            <div className="truncate font-semibold">
+              {q.massagePressure || "-"}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-[11px] font-bold uppercase text-[#847568]">
+              Head
+            </div>
+            <div className="truncate font-semibold">
+              {q.headPressure || "-"}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 md:justify-end">
+          <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#E5DFD4] bg-[#FAF8F5] px-3 text-xs font-semibold">
+            <input
+              type="checkbox"
+              checked={q.isDepositPaid}
+              onChange={(e) =>
+                handleCheckbox(q.id, "isDepositPaid", e.target.checked)
+              }
+              className="h-4 w-4"
+            />
+            มัดจำแล้ว
+          </label>
+
+          <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#E5DFD4] bg-[#FAF8F5] px-3 text-xs font-semibold">
+            <input
+              type="checkbox"
+              checked={q.isPaid}
+              onChange={(e) =>
+                handleCheckbox(q.id, "isPaid", e.target.checked)
+              }
+              className="h-4 w-4"
+            />
+            จ่ายครบ
+          </label>
+        </div>
+      </div>
+
+      {(q.caution || q.internalNote) && (
+        <div className="grid gap-2 border-t border-[#E5DFD4] bg-[#FFFDF9] px-4 py-3 text-sm sm:grid-cols-2">
+          {q.caution && (
+            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-red-700">
+              ⚠️ ข้อควรระวัง: {q.caution}
+            </div>
+          )}
+
+          {q.internalNote && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800">
+              📝 โน้ตพนักงาน: {q.internalNote}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
   const renderTable = (list: QueueItem[], emptyText: string) => (
     <div className="overflow-x-auto rounded-lg border border-[var(--color-light-brown)] bg-white shadow-sm">
