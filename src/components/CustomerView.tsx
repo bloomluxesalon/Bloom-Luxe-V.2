@@ -99,7 +99,7 @@ useEffect(() => {
     if (!bookingDate) return [];
 
     const occupied = getOccupiedSlots(bookingDate);
-    const interval = 30;
+    const interval = 5;
     const isToday = bookingDate === todayStr;
     const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
     const duration = course.includes("90") ? 90 : 60;
@@ -400,7 +400,7 @@ if (lineUserId) {
                   <input
                     required
                     type="time"
-                    step={1800}
+                    step={300}
                     value={bookingTime}
                     disabled={!bookingDate}
                     onChange={(e) => setBookingTime(e.target.value)}
