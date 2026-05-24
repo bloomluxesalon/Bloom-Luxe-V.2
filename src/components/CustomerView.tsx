@@ -34,46 +34,44 @@ export function CustomerView() {
   const [bookingTime, setBookingTime] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    async function initLiff() {
-      try {
-        if (typeof liff === "undefined") {
-          console.log("LIFF SDK not loaded");
-          return;
-        }
-
-        await liff.init({
-          liffId: "2009162443-gCuBKaOD",
-        });
-
-        // เปิดจาก browser ปกติ: ไม่เด้งเข้า LINE
-        if (!liff.isInClient() && !liff.isLoggedIn()) {
-          console.log("Opened in normal browser. Skip LINE login.");
-          return;
-        }
-
-        // เปิดใน LINE แต่ยังไม่ได้ login
-        if (!liff.isLoggedIn()) {
-          liff.login();
-          return;
-        }
-
-        const profile = await liff.getProfile();
-
-        setNickname(profile.displayName || "");
-        setLineUserId(profile.userId || null);
-
-        setLiffProfile({
-          displayName: profile.displayName || "",
-          pictureUrl: profile.pictureUrl || "",
-        });
-      } catch (error) {
-        console.error("LIFF ERROR:", error);
+useEffect(() => {
+  async function initLiff() {
+    try {
+      if (typeof liff === "undefined") {
+        console.error("LIFF SDK not loaded");
+        return;
       }
-    }
 
-    initLiff();
-  }, []);
+      await liff.init({
+        liffId: "2009162443-gCuBKaOD",
+      });
+
+      console.log("LIFF ready");
+      console.log("isInClient:", liff.isInClient());
+      console.log("isLoggedIn:", liff.isLoggedIn());
+
+      if (!liff.isLoggedIn()) {
+        liff.login();
+        return;
+      }
+
+      const profile = await liff.getProfile();
+
+      console.log("LINE PROFILE:", profile);
+
+      setNickname(profile.displayName || "");
+      setLineUserId(profile.userId || null);
+      setLiffProfile({
+        displayName: profile.displayName || "",
+        pictureUrl: profile.pictureUrl || "",
+      });
+    } catch (error) {
+      console.error("LIFF ERROR:", error);
+    }
+  }
+
+  initLiff();
+}, []);
 
   const getOccupiedSlots = (dateStr: string) =>
     queues
