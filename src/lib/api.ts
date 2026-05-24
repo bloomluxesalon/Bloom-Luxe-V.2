@@ -108,25 +108,30 @@ export const saveDatabase = async (queues: QueueItem[], settings: SystemSettings
 
 export const sendLineNotification = async (userId: string, message: string) => {
   if (!API_URL) {
-    console.warn('Cannot send notification because VITE_GAS_API_URL is not configured.');
+    console.warn("Cannot send notification because VITE_GAS_API_URL is not configured.");
     return;
   }
 
   const payload = {
-    action: 'notify',
+    action: "notify",
     userId,
     message,
   };
 
   try {
-    await fetch(API_URL, {
-      method: 'POST',
+    const res = await fetch(API_URL, {
+      method: "POST",
       headers: {
-        'Content-Type': 'text/plain;charset=utf-8',
+        "Content-Type": "text/plain;charset=utf-8",
       },
       body: JSON.stringify(payload),
     });
+
+    const text = await res.text();
+    console.log("LINE notify response:", text);
+
+    return text;
   } catch (e) {
-    console.error('Notify failed', e);
+    console.error("Notify failed", e);
   }
 };

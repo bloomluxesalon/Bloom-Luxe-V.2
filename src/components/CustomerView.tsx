@@ -204,19 +204,23 @@ useEffect(() => {
       localStorage.setItem("bloom_my_queue_id", newId);
       localStorage.setItem("bloom_my_queue_status", "Waiting");
 
-      if (lineUserId) {
-        await sendLineNotification(
-          lineUserId,
-          `✅ จองสำเร็จค่ะ\n\n` +
-            `เลขคิว: ${newId}\n` +
-            `ชื่อ: ${nickname}\n` +
-            `เบอร์โทร: ${phone}\n` +
-            `วันที่: ${bookingDate}\n` +
-            `เวลา: ${bookingTime}\n` +
-            `คอร์ส: ${course}\n\n` +
-            `ขอบคุณที่ใช้บริการ Bloom Luxe Salon 🌸`
-        );
-      }
+if (lineUserId) {
+  const customerMessage =
+    `✅ จองสำเร็จค่ะ\n\n` +
+    `เลขคิว: ${newId}\n` +
+    `ชื่อ: ${nickname}\n` +
+    `เบอร์โทร: ${phone}\n` +
+    `วันที่: ${bookingDate}\n` +
+    `เวลา: ${bookingTime}\n` +
+    `คอร์ส: ${course}\n\n` +
+    `ขอบคุณที่ใช้บริการ Bloom Luxe Salon 🌸`;
+
+  console.log("Send LINE to customer:", lineUserId, customerMessage);
+
+  await sendLineNotification(lineUserId, customerMessage);
+} else {
+  console.warn("No lineUserId. Customer notification skipped.");
+}
 
       const staffMessage =
         `🔔 มีคิวจองใหม่ ${newId}\n\n` +
