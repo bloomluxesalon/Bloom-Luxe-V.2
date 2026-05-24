@@ -32,6 +32,12 @@ const writeCache = <T>(key: string, value: T) => {
   }
 };
 
+const stripUndefinedFields = <T extends Record<string, any>>(value: T): T => {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, fieldValue]) => fieldValue !== undefined),
+  ) as T;
+};
+
 const getFallbackDatabase = (): { queues: QueueItem[]; settings: SystemSettings } => {
   const queues = readCache<QueueItem[]>(QUEUE_CACHE_KEY) || [];
   const settings = readCache<SystemSettings>(SETTINGS_CACHE_KEY) || { id: 'SYS_SETTINGS', staffLineIds: ['', '', '', '', '', ''] };
@@ -81,10 +87,10 @@ export const saveDatabase = async (queues: QueueItem[], settings: SystemSettings
     });
 
     queues.forEach((item) => {
-      batch.set(doc(db, 'queues', item.id), item);
+      batch.set(doc(db, 'queues', item.id), stripUndefinedFields(item));
     });
 
-    batch.set(settingsDoc, settings);
+    batch.set(settingsDoc, stripUndefinedFields(settings));
 
     await batch.commit();
 
