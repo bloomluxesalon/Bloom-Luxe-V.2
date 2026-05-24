@@ -47,35 +47,30 @@ useEffect(() => {
       });
 
       console.log("LIFF READY");
+      console.log("isInClient:", liff.isInClient());
+      console.log("isLoggedIn:", liff.isLoggedIn());
 
-      // เปิดผ่าน browser ปกติ
-      // ไม่ต้อง login LINE
+      // เปิดเว็บปกติ ไม่ต้อง login LINE
       if (!liff.isInClient()) {
-        console.log("Browser mode");
+        console.log("Browser mode: booking only, no LINE notify.");
         return;
       }
 
-      // เปิดใน LINE แต่ยังไม่ได้ login
-      // ไม่ต้องเด้ง login
+      // เปิดใน LINE แล้วให้ login เพื่อเอา userId
       if (!liff.isLoggedIn()) {
-        console.log("LINE opened but not logged in");
+        liff.login();
         return;
       }
 
-      // ดึง profile
       const profile = await liff.getProfile();
 
-      console.log("LINE PROFILE:", profile);
-
       setNickname(profile.displayName || "");
-
       setLineUserId(profile.userId || null);
 
       setLiffProfile({
         displayName: profile.displayName || "",
         pictureUrl: profile.pictureUrl || "",
       });
-
     } catch (error) {
       console.error("LIFF ERROR:", error);
     }
