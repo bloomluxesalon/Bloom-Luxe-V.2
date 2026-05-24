@@ -34,6 +34,8 @@ jobs:
 
       - name: Build static site
         run: npm run build:pages
+        env:
+          VITE_GAS_API_URL: https://script.google.com/macros/s/AKfycbzAgigvnk7jgMdWA14os6oqFtLOYmLyIgXES6Up-pVL7Eu5F-sUcv8MFlD0io0Rhj1i5g/exec
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
