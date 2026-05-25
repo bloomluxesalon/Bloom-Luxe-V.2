@@ -285,11 +285,14 @@ export function AdminView() {
           </button>
         </>
       )}
-      {!["Completed", "Cancelled", "Archived"].includes(q.status) && (
-        <button onClick={() => openEdit(q)} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[var(--color-light-brown)] bg-white px-3 text-xs font-bold text-[var(--color-primary-brown)] hover:bg-[#F8F4EE]">
-          <Edit3 size={14} /> Edit
-        </button>
-      )}
+{q.status !== "Archived" && (
+  <button
+    onClick={() => openEdit(q)}
+    className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[var(--color-light-brown)] bg-white px-3 text-xs font-bold text-[var(--color-primary-brown)] hover:bg-[#F8F4EE]"
+  >
+    <Edit3 size={14} /> Edit
+  </button>
+)}
     </div>
   );
 
