@@ -12,8 +12,8 @@ app.use(express.json({ limit: "50mb" }));
 const GITHUB_OWNER = process.env.GITHUB_OWNER || "bsexpressthailand0-commits";
 const GITHUB_REPO = process.env.GITHUB_REPO || "bloom-luxe-db";
 const GITHUB_PATH = process.env.GITHUB_PATH || "database.json";
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN || "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";
-const GAS_API_URL = process.env.GAS_API_URL || "https://script.google.com/macros/s/AKfycby4gi1s0ph2pPPHu423muiauix7XTsRizbpH2SuS5ggTTzET6t1mKxsAjCcVoVox6zf/exec";
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+const GAS_API_URL = process.env.GAS_API_URL;
 
 const getHeaders = () => {
   const headers: Record<string, string> = {
@@ -63,6 +63,11 @@ app.put("/api/database", async (req, res) => {
 
 // API: Send LINE Notification
 app.post("/api/notify", async (req, res) => {
+  if (!GAS_API_URL) {
+    res.status(503).json({ error: "GAS_API_URL is not configured" });
+    return;
+  }
+
   try {
     const response = await fetch(GAS_API_URL, {
       method: "POST",

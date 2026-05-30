@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { QueueItem, SystemSettings } from "../types";
-import { fetchDatabase, saveDatabase } from "./api";
+import { fetchDatabase, saveQueues, saveSettings } from "./api";
 
 interface AppContextType {
   queues: QueueItem[];
@@ -42,22 +42,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const updateQueues = async (newQueues: QueueItem[]) => {
     try {
-      await saveDatabase(newQueues, settings || { id: 'SYS_SETTINGS', staffLineIds: ["", "", "", "", "", ""] });
-      setQueues(newQueues);
+      const result = await saveQueues(newQueues, queues);
+      setQueues(result.queues);
+      setStatus('live');
+      setStatusCode(undefined);
       return true;
     } catch (err) {
       console.error(err);
+      setStatus('error');
+      setStatusCode('SAVE');
       return false;
     }
   };
 
   const updateSettings = async (newSettings: SystemSettings) => {
     try {
-      await saveDatabase(queues, newSettings);
-      setSettings(newSettings);
+      const result = await saveSettings(newSettings);
+      setSettings(result.settings);
+      setStatus('live');
+      setStatusCode(undefined);
       return true;
     } catch (err) {
       console.error(err);
+      setStatus('error');
+      setStatusCode('SAVE');
       return false;
     }
   };

@@ -1,0 +1,30 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isValidQueue() {
+      return request.resource.data.id is string
+        && request.resource.data.nickname is string
+        && request.resource.data.bookingDate is string
+        && request.resource.data.bookingTime is string
+        && request.resource.data.status in ['Pending', 'Waiting', 'Serving', 'Completed', 'Cancelled', 'Archived']
+        && request.resource.data.orderType in ['walkin', 'booking']
+        && request.resource.data.isPaid is bool
+        && request.resource.data.isDepositPaid is bool;
+    }
+
+    match /queues/{queueId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && request.resource.data.id == queueId && isValidQueue();
+      allow delete: if signedIn();
+    }
+
+    match /metadata/SYS_SETTINGS {
+      allow read, write: if signedIn();
+    }
+  }
+}

@@ -15,6 +15,9 @@ export interface QueueItem {
   caution: string;
   status: 'Pending' | 'Waiting' | 'Serving' | 'Completed' | 'Cancelled' | 'Archived';
   timestamp: string;
+  createdAt?: string;
+  updatedAt?: string;
+  completedAt?: string;
   isPaid: boolean;
   isDepositPaid: boolean;
   actualPrice?: number;
@@ -22,6 +25,8 @@ export interface QueueItem {
   serviceStartTime?: string;
   notifiedNext?: boolean;
   lineUserId?: string;
+  lineDisplayName?: string;
+  linePictureUrl?: string;
   discount?: string;
 }
 
