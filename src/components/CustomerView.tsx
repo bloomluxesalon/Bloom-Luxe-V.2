@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
+import { Loader2 } from "lucide-react";
 import { useAppContext } from "../lib/AppContext";
 import { MAX_CONCURRENT_BOOKINGS, SERVICE_PRICES } from "../lib/utils";
 import { showToast } from "./Toast";
@@ -34,6 +35,7 @@ export function CustomerView() {
   const [bookingTime, setBookingTime] = useState("");
   const [selectedHour, setSelectedHour] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<"idle" | "saving">("idle");
 
 useEffect(() => {
   async function initLiff() {
@@ -176,9 +178,14 @@ useEffect(() => {
   const staffLineIds = (settings?.staffLineIds || [])
     .map((id) => id.trim())
     .filter(Boolean);
+  const submitStatusText =
+    submitStatus === "saving"
+      ? "Saving booking... / กำลังบันทึกคิว..."
+      : "";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
 
     if (!bookingDate) {
       return showToast("Please select booking date / กรุณาเลือกวันที่จอง", "error");
@@ -193,6 +200,7 @@ useEffect(() => {
     }
 
     setIsSubmitting(true);
+    setSubmitStatus("saving");
 
     const defaultPrice = course.includes("90")
       ? SERVICE_PRICES["90 min"]
@@ -228,6 +236,9 @@ useEffect(() => {
     if (savedQueue) {
       localStorage.setItem("bloom_my_queue_id", newId);
       localStorage.setItem("bloom_my_queue_status", "Waiting");
+      setIsSubmitting(false);
+      setSubmitStatus("idle");
+      setIsSuccess(true);
 
 if (lineUserId) {
   const customerMessage =
@@ -242,7 +253,9 @@ if (lineUserId) {
 
   console.log("Send LINE to customer:", lineUserId, customerMessage);
 
-  await sendLineNotification(lineUserId, customerMessage);
+  sendLineNotification(lineUserId, customerMessage).catch((error) => {
+    console.error("Failed to send LINE notification to customer:", error);
+  });
 } else {
   console.warn("No lineUserId. Customer notification skipped.");
 }
@@ -255,16 +268,23 @@ if (lineUserId) {
         `⏰ เวลา: ${bookingTime}\n` +
         `🧾 คอร์ส: ${course}`;
 
-      staffLineIds.forEach((staffId) => {
-        sendLineNotification(staffId, staffMessage);
+      const staffNotifications = staffLineIds.map((staffId) =>
+        sendLineNotification(staffId, staffMessage)
+      );
+      Promise.allSettled(staffNotifications).then((staffResults) => {
+        staffResults.forEach((result, index) => {
+          if (result.status === "rejected") {
+            console.error("Failed to send LINE notification to staff:", staffLineIds[index], result.reason);
+          }
+        });
       });
-
-      setIsSuccess(true);
+      return;
     } else {
       showToast("Failed to save booking / บันทึกการจองไม่สำเร็จ", "error");
     }
 
     setIsSubmitting(false);
+    setSubmitStatus("idle");
   };
 
   if (isSuccess) {
@@ -699,12 +719,16 @@ if (lineUserId) {
           <button
             disabled={isSubmitting}
             type="submit"
-            className="w-full py-4 rounded-xl font-bold text-white text-lg bg-gradient-to-r from-[var(--color-primary-brown)] to-[#705C4D] shadow-lg shadow-[var(--color-primary-brown)]/30 transition-all hover:scale-[1.02] disabled:opacity-75"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[var(--color-primary-brown)] to-[#705C4D] py-4 text-lg font-bold text-white shadow-lg shadow-[var(--color-primary-brown)]/30 transition-all hover:scale-[1.02] disabled:cursor-wait disabled:opacity-75"
           >
-            {isSubmitting
-              ? "Requesting... / กำลังส่งคำขอ..."
-              : "Select Details / ยืนยัน"}
+            {isSubmitting && <Loader2 size={20} className="animate-spin" />}
+            {isSubmitting ? submitStatusText || "Requesting... / กำลังส่งคำขอ..." : "Select Details / ยืนยัน"}
           </button>
+          {isSubmitting && (
+            <p className="text-center text-xs font-semibold text-[#847568]" aria-live="polite">
+              Please wait, do not close this page. / กรุณารอสักครู่ อย่าเพิ่งปิดหน้านี้
+            </p>
+          )}
         </form>
       </div>
     </div>
