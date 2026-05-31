@@ -9,6 +9,7 @@ import {
   History,
   LayoutDashboard,
   ListFilter,
+  Loader2,
   Play,
   Search,
   Settings,
@@ -131,6 +132,10 @@ export function AdminView() {
   const [showSettings, setShowSettings] = useState(false);
   const [editingQueue, setEditingQueue] = useState<QueueItem | null>(null);
   const [staffLineIdsDraft, setStaffLineIdsDraft] = useState<string[]>([]);
+  const [statusActionKey, setStatusActionKey] = useState<string | null>(null);
+  const [paymentActionKey, setPaymentActionKey] = useState<string | null>(null);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const todayStr = format(new Date(), "yyyy-MM-dd");
   const servings = queues.filter((q) => q.status === "Serving");
@@ -187,8 +192,12 @@ export function AdminView() {
   const filteredHistory = historyList.filter((q) => matchesSearch(q) && applyStatusFilter(q));
 
   const handleUpdateStatus = async (id: string, newStatus: QueueItem["status"]) => {
+    const actionKey = `status:${id}:${newStatus}`;
+    if (statusActionKey) return;
+
     const q = queues.find((x) => x.id === id);
     if (!q) return;
+    setStatusActionKey(actionKey);
 
     const newQueues = queues.map((item) => {
       if (item.id !== id) return item;
@@ -197,6 +206,7 @@ export function AdminView() {
     });
 
     const success = await updateQueues(newQueues);
+    setStatusActionKey((current) => (current === actionKey ? null : current));
     if (!success) {
       showToast("อัปเดตไม่สำเร็จ", "error");
       return;
@@ -218,8 +228,9 @@ export function AdminView() {
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingQueue) return;
+    if (!editingQueue || isSavingEdit) return;
 
+    setIsSavingEdit(true);
     const newQueues = queues.map((item) => (item.id === editingQueue.id ? editingQueue : item));
     if (await updateQueues(newQueues)) {
       showToast("แก้ไขข้อมูลสำเร็จ", "success");
@@ -227,19 +238,27 @@ export function AdminView() {
     } else {
       showToast("เกิดข้อผิดพลาด", "error");
     }
+    setIsSavingEdit(false);
   };
 
   const handleCheckbox = async (id: string, field: "isPaid" | "isDepositPaid", val: boolean) => {
+    const actionKey = `payment:${id}:${field}`;
+    if (paymentActionKey) return;
+
+    setPaymentActionKey(actionKey);
     const newQueues = queues.map((item) => (item.id === id ? { ...item, [field]: val } : item));
     const success = await updateQueues(newQueues);
     showToast(success ? "อัปเดตสำเร็จ" : "อัปเดตไม่สำเร็จ", success ? "success" : "error");
+    setPaymentActionKey((current) => (current === actionKey ? null : current));
   };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!settings) return;
+    if (!settings || isSavingSettings) return;
+    setIsSavingSettings(true);
     if (await updateSettings({ ...settings, staffLineIds: staffLineIdsDraft })) showToast("บันทึกการตั้งค่าสำเร็จ", "success");
     else showToast("บันทึกการตั้งค่าไม่สำเร็จ", "error");
+    setIsSavingSettings(false);
   };
 
   const openEdit = (q: QueueItem) => {
@@ -250,54 +269,70 @@ export function AdminView() {
     });
   };
 
-  const renderActions = (q: QueueItem) => (
-    <div className="flex flex-wrap items-center gap-2">
-      {q.status === "Serving" && q.serviceStartTime && (
-        <ServiceTimer startTime={q.serviceStartTime} course={q.course} onComplete={() => handleUpdateStatus(q.id, "Completed")} />
-      )}
-      {q.status === "Pending" && (
-        <>
-          <button onClick={() => handleUpdateStatus(q.id, "Waiting")} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-700">
-            <Check size={15} /> Confirm
-          </button>
-          <button onClick={() => handleUpdateStatus(q.id, "Cancelled")} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-red-200 bg-white px-3 text-xs font-bold text-red-700 hover:bg-red-50">
-            <X size={15} /> Reject
-          </button>
-        </>
-      )}
-      {q.status === "Waiting" && (
-        <>
-          <button onClick={() => handleUpdateStatus(q.id, "Serving")} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-green-700 px-3 text-xs font-bold text-white hover:bg-green-800">
-            <Play size={15} /> Start
-          </button>
-          <button onClick={() => handleUpdateStatus(q.id, "Cancelled")} className="inline-flex h-9 items-center rounded-md border border-red-200 bg-white px-3 text-xs font-bold text-red-700 hover:bg-red-50">
-            Cancel
-          </button>
-        </>
-      )}
-      {q.status === "Serving" && (
-        <>
-          <button onClick={() => handleUpdateStatus(q.id, "Completed")} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-[var(--color-dark-brown)] px-3 text-xs font-bold text-white hover:bg-[#2c231e]">
-            <CheckCircle2 size={15} /> Done
-          </button>
-          <button onClick={() => handleUpdateStatus(q.id, "Cancelled")} className="inline-flex h-9 items-center rounded-md border border-red-200 bg-white px-3 text-xs font-bold text-red-700 hover:bg-red-50">
-            Cancel
-          </button>
-        </>
-      )}
-{q.status !== "Archived" && (
-  <button
-    onClick={() => openEdit(q)}
-    className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[var(--color-light-brown)] bg-white px-3 text-xs font-bold text-[var(--color-primary-brown)] hover:bg-[#F8F4EE]"
-  >
-    <Edit3 size={14} /> Edit
-  </button>
-)}
-    </div>
+  const renderBusyLabel = (label: string, isBusy: boolean, icon?: React.ReactNode) => (
+    <>
+      {isBusy ? <Loader2 size={15} className="animate-spin" /> : icon}
+      {isBusy ? "Saving..." : label}
+    </>
   );
+
+  const renderActions = (q: QueueItem) => {
+    const rowStatusBusy = statusActionKey?.startsWith(`status:${q.id}:`) || false;
+    const isActionBusy = (status: QueueItem["status"]) => statusActionKey === `status:${q.id}:${status}`;
+
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        {q.status === "Serving" && q.serviceStartTime && (
+          <ServiceTimer startTime={q.serviceStartTime} course={q.course} onComplete={() => handleUpdateStatus(q.id, "Completed")} />
+        )}
+        {q.status === "Pending" && (
+          <>
+            <button disabled={rowStatusBusy} onClick={() => handleUpdateStatus(q.id, "Waiting")} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-700 disabled:cursor-wait disabled:opacity-70">
+              {renderBusyLabel("Confirm", isActionBusy("Waiting"), <Check size={15} />)}
+            </button>
+            <button disabled={rowStatusBusy} onClick={() => handleUpdateStatus(q.id, "Cancelled")} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-red-200 bg-white px-3 text-xs font-bold text-red-700 hover:bg-red-50 disabled:cursor-wait disabled:opacity-70">
+              {renderBusyLabel("Reject", isActionBusy("Cancelled"), <X size={15} />)}
+            </button>
+          </>
+        )}
+        {q.status === "Waiting" && (
+          <>
+            <button disabled={rowStatusBusy} onClick={() => handleUpdateStatus(q.id, "Serving")} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-green-700 px-3 text-xs font-bold text-white hover:bg-green-800 disabled:cursor-wait disabled:opacity-70">
+              {renderBusyLabel("Start", isActionBusy("Serving"), <Play size={15} />)}
+            </button>
+            <button disabled={rowStatusBusy} onClick={() => handleUpdateStatus(q.id, "Cancelled")} className="inline-flex h-9 items-center rounded-md border border-red-200 bg-white px-3 text-xs font-bold text-red-700 hover:bg-red-50 disabled:cursor-wait disabled:opacity-70">
+              {renderBusyLabel("Cancel", isActionBusy("Cancelled"))}
+            </button>
+          </>
+        )}
+        {q.status === "Serving" && (
+          <>
+            <button disabled={rowStatusBusy} onClick={() => handleUpdateStatus(q.id, "Completed")} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-[var(--color-dark-brown)] px-3 text-xs font-bold text-white hover:bg-[#2c231e] disabled:cursor-wait disabled:opacity-70">
+              {renderBusyLabel("Done", isActionBusy("Completed"), <CheckCircle2 size={15} />)}
+            </button>
+            <button disabled={rowStatusBusy} onClick={() => handleUpdateStatus(q.id, "Cancelled")} className="inline-flex h-9 items-center rounded-md border border-red-200 bg-white px-3 text-xs font-bold text-red-700 hover:bg-red-50 disabled:cursor-wait disabled:opacity-70">
+              {renderBusyLabel("Cancel", isActionBusy("Cancelled"))}
+            </button>
+          </>
+        )}
+        {q.status !== "Archived" && (
+          <button
+            disabled={rowStatusBusy}
+            onClick={() => openEdit(q)}
+            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-[var(--color-light-brown)] bg-white px-3 text-xs font-bold text-[var(--color-primary-brown)] hover:bg-[#F8F4EE] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Edit3 size={14} /> Edit
+          </button>
+        )}
+      </div>
+    );
+  };
 
 const renderQueueCard = (q: QueueItem) => {
   const inactive = ["Completed", "Cancelled", "Archived"].includes(q.status);
+  const depositBusy = paymentActionKey === `payment:${q.id}:isDepositPaid`;
+  const paidBusy = paymentActionKey === `payment:${q.id}:isPaid`;
+  const rowPaymentBusy = depositBusy || paidBusy;
 
   return (
     <div
@@ -402,27 +437,31 @@ const renderQueueCard = (q: QueueItem) => {
         </div>
 
         <div className="flex flex-wrap gap-2 md:justify-end">
-          <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#E5DFD4] bg-[#FAF8F5] px-3 text-xs font-semibold">
+          <label className={`inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#E5DFD4] bg-[#FAF8F5] px-3 text-xs font-semibold ${rowPaymentBusy ? "cursor-wait opacity-70" : ""}`}>
             <input
               type="checkbox"
               checked={q.isDepositPaid}
+              disabled={rowPaymentBusy}
               onChange={(e) =>
                 handleCheckbox(q.id, "isDepositPaid", e.target.checked)
               }
               className="h-4 w-4"
             />
+            {depositBusy && <Loader2 size={14} className="animate-spin" />}
             มัดจำแล้ว
           </label>
 
-          <label className="inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#E5DFD4] bg-[#FAF8F5] px-3 text-xs font-semibold">
+          <label className={`inline-flex h-9 cursor-pointer items-center gap-2 rounded-md border border-[#E5DFD4] bg-[#FAF8F5] px-3 text-xs font-semibold ${rowPaymentBusy ? "cursor-wait opacity-70" : ""}`}>
             <input
               type="checkbox"
               checked={q.isPaid}
+              disabled={rowPaymentBusy}
               onChange={(e) =>
                 handleCheckbox(q.id, "isPaid", e.target.checked)
               }
               className="h-4 w-4"
             />
+            {paidBusy && <Loader2 size={14} className="animate-spin" />}
             จ่ายครบ
           </label>
         </div>
@@ -539,6 +578,7 @@ const renderQueueCard = (q: QueueItem) => {
                 key={i}
                 type="text"
                 value={staffLineIdsDraft[i] || ""}
+                disabled={isSavingSettings}
                 onChange={(e) => {
                   const newIds = [...staffLineIdsDraft];
                   newIds[i] = e.target.value;
@@ -549,8 +589,9 @@ const renderQueueCard = (q: QueueItem) => {
               />
             ))}
           </div>
-          <button type="submit" className="mt-3 inline-flex h-10 items-center rounded-md bg-[var(--color-dark-brown)] px-4 text-sm font-bold text-white">
-            Save Settings
+          <button type="submit" disabled={isSavingSettings} className="mt-3 inline-flex h-10 items-center gap-2 rounded-md bg-[var(--color-dark-brown)] px-4 text-sm font-bold text-white disabled:cursor-wait disabled:opacity-70">
+            {isSavingSettings && <Loader2 size={16} className="animate-spin" />}
+            {isSavingSettings ? "Saving..." : "Save Settings"}
           </button>
         </form>
       )}
@@ -675,7 +716,7 @@ const renderQueueCard = (q: QueueItem) => {
           <div className="w-full max-w-xl rounded-lg border border-[var(--color-light-brown)] bg-[var(--color-bg-cream)] p-5 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-bold text-[var(--color-dark-brown)]">Edit Queue</h3>
-              <button onClick={() => setEditingQueue(null)} className="rounded-md p-2 text-[#847568] hover:bg-white hover:text-red-600">
+              <button disabled={isSavingEdit} onClick={() => setEditingQueue(null)} className="rounded-md p-2 text-[#847568] hover:bg-white hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50">
                 <X size={18} />
               </button>
             </div>
@@ -738,9 +779,9 @@ const renderQueueCard = (q: QueueItem) => {
                 <textarea value={editingQueue.internalNote || ""} onChange={(e) => setEditingQueue({ ...editingQueue, internalNote: e.target.value })} rows={3} className="glass-input mt-1 !rounded-md bg-white text-sm" />
               </label>
 
-              <button type="submit" className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-green-700 text-sm font-bold text-white hover:bg-green-800">
-                <Check size={17} />
-                Save Changes
+              <button type="submit" disabled={isSavingEdit} className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-md bg-green-700 text-sm font-bold text-white hover:bg-green-800 disabled:cursor-wait disabled:opacity-70">
+                {isSavingEdit ? <Loader2 size={17} className="animate-spin" /> : <Check size={17} />}
+                {isSavingEdit ? "Saving..." : "Save Changes"}
               </button>
             </form>
           </div>
