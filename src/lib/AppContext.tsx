@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { QueueItem, SystemSettings } from "../types";
-import { fetchDatabase, saveQueues, saveSettings } from "./api";
+import { createQueueBooking, fetchDatabase, saveQueues, saveSettings } from "./api";
 
 interface AppContextType {
   queues: QueueItem[];
@@ -8,6 +8,7 @@ interface AppContextType {
   status: 'live' | 'error';
   statusCode?: string;
   refresh: () => Promise<void>;
+  createQueue: (newQueue: Omit<QueueItem, 'id'>) => Promise<QueueItem | null>;
   updateQueues: (newQueues: QueueItem[]) => Promise<boolean>;
   updateSettings: (newSettings: SystemSettings) => Promise<boolean>;
 }
@@ -55,6 +56,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const createQueue = async (newQueue: Omit<QueueItem, 'id'>) => {
+    try {
+      const result = await createQueueBooking(newQueue, queues);
+      setQueues(result.queues);
+      setStatus('live');
+      setStatusCode(undefined);
+      return result.queue;
+    } catch (err) {
+      console.error(err);
+      setStatus('error');
+      setStatusCode('SAVE');
+      return null;
+    }
+  };
+
   const updateSettings = async (newSettings: SystemSettings) => {
     try {
       const result = await saveSettings(newSettings);
@@ -71,7 +87,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AppContext.Provider value={{ queues, settings, status, statusCode, refresh: loadData, updateQueues, updateSettings }}>
+    <AppContext.Provider value={{ queues, settings, status, statusCode, refresh: loadData, createQueue, updateQueues, updateSettings }}>
       {children}
     </AppContext.Provider>
   );

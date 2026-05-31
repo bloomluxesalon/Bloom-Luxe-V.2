@@ -8,7 +8,7 @@ import { sendLineNotification } from "../lib/api";
 declare const liff: any;
 
 export function CustomerView() {
-  const { queues, settings, updateQueues } = useAppContext();
+  const { queues, settings, createQueue } = useAppContext();
   const [isSuccess, setIsSuccess] = useState(false);
   const formType = "walkin";
 
@@ -194,19 +194,11 @@ useEffect(() => {
 
     setIsSubmitting(true);
 
-    const maxId = queues.reduce(
-      (max, q) => Math.max(max, parseInt(q.id.replace(/\D/g, ""), 10) || 0),
-      0
-    );
-
-    const newId = "Q-" + String(maxId + 1).padStart(3, "0");
-
     const defaultPrice = course.includes("90")
       ? SERVICE_PRICES["90 min"]
       : SERVICE_PRICES["60 min"];
 
     const newQueue = {
-      id: newId,
       orderType: formType,
       nickname,
       phone,
@@ -230,9 +222,10 @@ useEffect(() => {
       linePictureUrl: liffProfile?.pictureUrl || "",
     };
 
-    const success = await updateQueues([...queues, newQueue]);
+    const savedQueue = await createQueue(newQueue);
+    const newId = savedQueue?.id || "";
 
-    if (success) {
+    if (savedQueue) {
       localStorage.setItem("bloom_my_queue_id", newId);
       localStorage.setItem("bloom_my_queue_status", "Waiting");
 

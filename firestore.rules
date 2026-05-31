@@ -26,5 +26,13 @@ service cloud.firestore {
     match /metadata/SYS_SETTINGS {
       allow read, write: if signedIn();
     }
+
+    match /metadata/QUEUE_COUNTER {
+      allow read, write: if signedIn();
+    }
+
+    match /bookingSchedules/{scheduleId} {
+      allow read, write: if signedIn();
+    }
   }
 }

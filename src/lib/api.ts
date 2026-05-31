@@ -1,6 +1,7 @@
-import { collection, doc, getDoc, getDocs, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, runTransaction, writeBatch } from 'firebase/firestore';
 import { db } from './firebase';
 import { QueueItem, SystemSettings } from '../types';
+import { MAX_CONCURRENT_BOOKINGS } from './utils';
 
 const API_URL = import.meta.env.VITE_GAS_API_URL;
 const QUEUE_CACHE_KEY = 'bloom_luxe_queue_cache';
@@ -20,6 +21,23 @@ if (!API_URL) {
 
 const queueCollection = collection(db, 'queues');
 const settingsDoc = doc(db, 'metadata', 'SYS_SETTINGS');
+const queueCounterDoc = doc(db, 'metadata', 'QUEUE_COUNTER');
+
+type BookingScheduleEntry = {
+  id: string;
+  start: number;
+  end: number;
+};
+
+type BookingSchedule = {
+  date: string;
+  entries: BookingScheduleEntry[];
+  updatedAt: string;
+};
+
+type CreateQueueInput = Omit<QueueItem, 'id'>;
+
+const activeStatuses: QueueItem['status'][] = ['Pending', 'Waiting', 'Serving'];
 
 const readCache = <T>(key: string): T | null => {
   try {
@@ -44,6 +62,55 @@ const stripUndefinedFields = <T extends Record<string, any>>(value: T): T => {
   return Object.fromEntries(
     Object.entries(value).filter(([, fieldValue]) => fieldValue !== undefined),
   ) as T;
+};
+
+const getQueueNumber = (id: string) => parseInt(id.replace(/\D/g, ''), 10) || 0;
+
+const getMaxQueueNumber = (queues: QueueItem[]) =>
+  queues.reduce((max, item) => Math.max(max, getQueueNumber(item.id)), 0);
+
+const getQueueInterval = (item: Pick<QueueItem, 'bookingTime' | 'course'>) => {
+  const [hh = '0', mm = '0'] = (item.bookingTime || '00:00').split(':');
+  const start = (parseInt(hh, 10) || 0) * 60 + (parseInt(mm, 10) || 0);
+  const duration = item.course.includes('90') ? 90 : 60;
+  return { start, end: start + duration };
+};
+
+const getScheduleEntries = (queues: QueueItem[], date: string): BookingScheduleEntry[] =>
+  queues
+    .filter((item) => item.bookingDate === date && activeStatuses.includes(item.status))
+    .map((item) => ({
+      id: item.id,
+      ...getQueueInterval(item),
+    }));
+
+const getTouchedBookingDates = (previousQueues: QueueItem[], nextQueues: QueueItem[]) => {
+  const dates = new Set<string>();
+
+  previousQueues.forEach((item) => {
+    if (item.bookingDate) dates.add(item.bookingDate);
+  });
+
+  nextQueues.forEach((item) => {
+    if (item.bookingDate) dates.add(item.bookingDate);
+  });
+
+  return dates;
+};
+
+const assertScheduleHasCapacity = (
+  entries: BookingScheduleEntry[],
+  nextEntry: BookingScheduleEntry,
+) => {
+  for (let minute = nextEntry.start; minute < nextEntry.end; minute += 1) {
+    const overlap = entries.filter(
+      (entry) => minute < entry.end && minute + 1 > entry.start,
+    ).length;
+
+    if (overlap >= MAX_CONCURRENT_BOOKINGS) {
+      throw new Error('Selected time is no longer available.');
+    }
+  }
 };
 
 const normalizeQueue = (item: QueueItem): QueueItem => {
@@ -148,6 +215,64 @@ export const fetchDatabase = async (): Promise<{ queues: QueueItem[]; settings: 
   }
 };
 
+export const createQueueBooking = async (queueInput: CreateQueueInput, seedQueues: QueueItem[]) => {
+  const createdQueue = await runTransaction(db, async (transaction) => {
+    const counterSnapshot = await transaction.get(queueCounterDoc);
+    const scheduleRef = doc(db, 'bookingSchedules', queueInput.bookingDate);
+    const scheduleSnapshot = await transaction.get(scheduleRef);
+
+    const seedMaxNumber = getMaxQueueNumber(seedQueues);
+    const counterNextNumber = counterSnapshot.exists()
+      ? Number(counterSnapshot.data().nextNumber) || 1
+      : 1;
+    const nextNumber = Math.max(counterNextNumber, seedMaxNumber + 1);
+    const id = `Q-${String(nextNumber).padStart(3, '0')}`;
+    const queueRef = doc(db, 'queues', id);
+    const now = new Date().toISOString();
+    const scheduleData = scheduleSnapshot.exists()
+      ? scheduleSnapshot.data() as BookingSchedule
+      : undefined;
+    const currentEntries = scheduleData?.entries || getScheduleEntries(seedQueues, queueInput.bookingDate);
+    const nextEntry = {
+      id,
+      ...getQueueInterval(queueInput),
+    };
+
+    assertScheduleHasCapacity(currentEntries, nextEntry);
+
+    const queue = normalizeQueue({
+      ...queueInput,
+      id,
+      timestamp: queueInput.timestamp || now,
+      createdAt: queueInput.createdAt || now,
+    });
+
+    validateQueue(queue);
+
+    transaction.set(queueRef, stripUndefinedFields(queue));
+    transaction.set(queueCounterDoc, {
+      id: 'QUEUE_COUNTER',
+      nextNumber: nextNumber + 1,
+      updatedAt: now,
+    });
+    transaction.set(scheduleRef, {
+      date: queueInput.bookingDate,
+      entries: [...currentEntries.filter((entry) => entry.id !== id), nextEntry],
+      updatedAt: now,
+    });
+
+    return queue;
+  });
+
+  const savedById = new Map(seedQueues.map((item) => [item.id, item]));
+  savedById.set(createdQueue.id, createdQueue);
+  const savedQueues = sortQueues(Array.from(savedById.values()));
+
+  writeCache(QUEUE_CACHE_KEY, savedQueues);
+
+  return { success: true, queue: createdQueue, queues: savedQueues };
+};
+
 export const saveQueues = async (nextQueues: QueueItem[], previousQueues: QueueItem[]) => {
   const batch = writeBatch(db);
   const previousById = new Map(previousQueues.map((item) => [item.id, item]));
@@ -173,6 +298,15 @@ export const saveQueues = async (nextQueues: QueueItem[], previousQueues: QueueI
       batch.delete(doc(db, 'queues', item.id));
       writeCount += 1;
     }
+  });
+
+  getTouchedBookingDates(previousQueues, normalizedNextQueues).forEach((date) => {
+    batch.set(doc(db, 'bookingSchedules', date), {
+      date,
+      entries: getScheduleEntries(normalizedNextQueues, date),
+      updatedAt: new Date().toISOString(),
+    });
+    writeCount += 1;
   });
 
   if (writeCount === 0) return { success: true, queues: sortQueues(previousQueues) };
