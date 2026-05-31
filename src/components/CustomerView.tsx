@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { useAppContext } from "../lib/AppContext";
 import { MAX_CONCURRENT_BOOKINGS, SERVICE_PRICES } from "../lib/utils";
@@ -32,6 +32,7 @@ export function CustomerView() {
   const todayStr = format(new Date(), "yyyy-MM-dd");
   const [bookingDate, setBookingDate] = useState("");
   const [bookingTime, setBookingTime] = useState("");
+  const [selectedHour, setSelectedHour] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
 useEffect(() => {
@@ -134,7 +135,43 @@ useEffect(() => {
     return slots;
   };
 
-  const availableTimeOptions = getAvailableTimeOptions();
+  const availableTimeOptions = useMemo(
+    () => getAvailableTimeOptions(),
+    [bookingDate, course, queues, todayStr]
+  );
+  const availableTimeSet = useMemo(
+    () => new Set(availableTimeOptions),
+    [availableTimeOptions]
+  );
+  const hourOptions = useMemo(
+    () =>
+      Array.from({ length: 24 }, (_, hour) => {
+        const hourText = hour.toString().padStart(2, "0");
+        return {
+          hour,
+          label: hourText,
+          hasAvailableTime: availableTimeOptions.some((time) =>
+            time.startsWith(`${hourText}:`)
+          ),
+        };
+      }),
+    [availableTimeOptions]
+  );
+  const selectedHourText =
+    selectedHour === null ? "" : selectedHour.toString().padStart(2, "0");
+  const selectedHourHasAvailability =
+    selectedHour !== null &&
+    hourOptions.some((option) => option.hour === selectedHour && option.hasAvailableTime);
+
+  useEffect(() => {
+    if (bookingTime && !availableTimeOptions.includes(bookingTime)) {
+      setBookingTime("");
+    }
+
+    if (selectedHour !== null && !selectedHourHasAvailability) {
+      setSelectedHour(null);
+    }
+  }, [availableTimeOptions, bookingTime, selectedHour, selectedHourHasAvailability]);
 
   const staffLineIds = (settings?.staffLineIds || [])
     .map((id) => id.trim())
@@ -334,7 +371,11 @@ if (lineUserId) {
                 <input
                   type="radio"
                   checked={course === "60 min"}
-                  onChange={() => setCourse("60 min")}
+                  onChange={() => {
+                    setCourse("60 min");
+                    setBookingTime("");
+                    setSelectedHour(null);
+                  }}
                   className="accent-[var(--color-primary-brown)]"
                 />
                 <span className="text-xs">
@@ -346,7 +387,11 @@ if (lineUserId) {
                 <input
                   type="radio"
                   checked={course === "90 min"}
-                  onChange={() => setCourse("90 min")}
+                  onChange={() => {
+                    setCourse("90 min");
+                    setBookingTime("");
+                    setSelectedHour(null);
+                  }}
                   className="accent-[var(--color-primary-brown)]"
                 />
                 <span className="text-xs">
@@ -385,6 +430,7 @@ if (lineUserId) {
                     onChange={(e) => {
                       setBookingDate(e.target.value);
                       setBookingTime("");
+                      setSelectedHour(null);
                     }}
                     className="glass-input h-12 bg-white/60 min-w-0 w-full max-w-full box-border"
                   />
@@ -396,16 +442,76 @@ if (lineUserId) {
                   Time / เวลา
                 </label>
 
-                <div className="min-w-0 w-full overflow-hidden rounded-xl">
-                  <input
-                    required
-                    type="time"
-                    step={60}
-                    value={bookingTime}
-                    disabled={!bookingDate}
-                    onChange={(e) => setBookingTime(e.target.value)}
-                    className="glass-input h-12 bg-white/60 min-w-0 w-full max-w-full box-border disabled:opacity-60"
-                  />
+                <div className="space-y-3">
+                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8">
+                    {hourOptions.map((option) => {
+                      const isSelected = selectedHour === option.hour;
+                      const isDisabled = !bookingDate || !option.hasAvailableTime;
+
+                      return (
+                        <button
+                          key={option.hour}
+                          type="button"
+                          disabled={isDisabled}
+                          onClick={() => {
+                            setSelectedHour(option.hour);
+                            setBookingTime("");
+                          }}
+                          className={`h-10 rounded-lg border text-sm font-bold transition ${
+                            isSelected
+                              ? "border-[var(--color-primary-brown)] bg-[var(--color-primary-brown)] text-white shadow-md"
+                              : option.hasAvailableTime
+                                ? "border-[var(--color-light-brown)] bg-white text-[var(--color-dark-brown)] hover:border-[var(--color-primary-brown)]"
+                                : "border-[#E5DFD4] bg-[#E9E2DA] text-white"
+                          } disabled:cursor-not-allowed disabled:opacity-75`}
+                        >
+                          {option.hasAvailableTime ? option.label : "-"}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {bookingDate && selectedHour !== null && (
+                    <div className="rounded-xl border border-[var(--color-light-brown)] bg-white/50 p-3">
+                      <div className="mb-2 flex items-center justify-between text-xs">
+                        <span className="font-bold text-[var(--color-primary-brown)]">
+                          {selectedHourText}:00 - {selectedHourText}:59
+                        </span>
+                        {bookingTime && (
+                          <span className="font-semibold text-[#847568]">
+                            Selected {bookingTime}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-5 gap-1.5 sm:grid-cols-10">
+                        {Array.from({ length: 60 }, (_, minute) => {
+                          const minuteText = minute.toString().padStart(2, "0");
+                          const time = `${selectedHourText}:${minuteText}`;
+                          const isAvailable = availableTimeSet.has(time);
+                          const isSelected = bookingTime === time;
+
+                          return (
+                            <button
+                              key={time}
+                              type="button"
+                              disabled={!isAvailable}
+                              onClick={() => setBookingTime(time)}
+                              className={`h-9 rounded-md border text-[11px] font-bold transition ${
+                                isSelected
+                                  ? "border-[#B68A45] bg-[#B68A45] text-white shadow-md"
+                                  : isAvailable
+                                    ? "border-[var(--color-primary-brown)] bg-[var(--color-dark-brown)] text-white hover:bg-[var(--color-primary-brown)]"
+                                    : "border-[#E5DFD4] bg-[#D7CDC4] text-white"
+                              } disabled:cursor-not-allowed disabled:opacity-80`}
+                            >
+                              {isAvailable ? time : "-"}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
