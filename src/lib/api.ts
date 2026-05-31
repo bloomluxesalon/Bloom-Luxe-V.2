@@ -1,5 +1,6 @@
+import { signInAnonymously } from 'firebase/auth';
 import { collection, doc, getDoc, getDocs, runTransaction, writeBatch } from 'firebase/firestore';
-import { db } from './firebase';
+import { auth, db } from './firebase';
 import { QueueItem, SystemSettings } from '../types';
 import { MAX_CONCURRENT_BOOKINGS } from './utils';
 
@@ -56,6 +57,12 @@ const writeCache = <T>(key: string, value: T) => {
   } catch {
     // ignore storage failures
   }
+};
+
+const ensureSignedIn = async () => {
+  if (auth.currentUser) return auth.currentUser;
+  const credential = await signInAnonymously(auth);
+  return credential.user;
 };
 
 const stripUndefinedFields = <T extends Record<string, any>>(value: T): T => {
@@ -189,6 +196,8 @@ const getFallbackDatabase = (): { queues: QueueItem[]; settings: SystemSettings 
 
 export const fetchDatabase = async (): Promise<{ queues: QueueItem[]; settings: SystemSettings }> => {
   try {
+    await ensureSignedIn();
+
     const queueSnapshot = await getDocs(queueCollection);
     const queues = queueSnapshot.docs.map((item) => ({
       id: item.id,
@@ -216,6 +225,8 @@ export const fetchDatabase = async (): Promise<{ queues: QueueItem[]; settings: 
 };
 
 export const createQueueBooking = async (queueInput: CreateQueueInput, seedQueues: QueueItem[]) => {
+  await ensureSignedIn();
+
   const createdQueue = await runTransaction(db, async (transaction) => {
     const counterSnapshot = await transaction.get(queueCounterDoc);
     const scheduleRef = doc(db, 'bookingSchedules', queueInput.bookingDate);
@@ -274,6 +285,8 @@ export const createQueueBooking = async (queueInput: CreateQueueInput, seedQueue
 };
 
 export const saveQueues = async (nextQueues: QueueItem[], previousQueues: QueueItem[]) => {
+  await ensureSignedIn();
+
   const batch = writeBatch(db);
   const previousById = new Map(previousQueues.map((item) => [item.id, item]));
   const nextById = new Map(nextQueues.map((item) => [item.id, item]));
@@ -334,6 +347,8 @@ export const saveSettings = async (settings: SystemSettings) => {
   const normalizedSettings = normalizeSettings(settings);
 
   try {
+    await ensureSignedIn();
+
     await writeBatch(db).set(settingsDoc, normalizedSettings).commit();
     writeCache(SETTINGS_CACHE_KEY, normalizedSettings);
     return { success: true, settings: normalizedSettings };
